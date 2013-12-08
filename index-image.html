@@ -1,0 +1,152 @@
+<html>
+<head>
+	<script src="/socket.io/socket.io.js"></script>
+		<script>
+			var socket = io.connect('http://ec2-54-200-33-16.us-west-2.compute.amazonaws.com:7171/', {'sync disconnect on unload': true });
+			
+			var myId = null;
+			var activeuser = null;
+			//var checkId = new Array();
+			var nick = null;
+			var pacglen = 0;
+			var clients = new Array();
+			
+			socket.on('connect', function() {
+				console.log("Connected");
+			});
+
+						 
+			socket.on('set_id', function(data){
+				myId = data;
+				console.log("myid is " + myId);
+				nick = prompt("Enter your name");
+	        
+				socket.emit('addnick', nick);
+				
+			});
+			
+			socket.on('addnewuser', function(nick){	
+				document.getElementById('userlist').innerHTML += ("<div id=\"id_" + nick + "\">" + "User joined: " + nick + "</div>");
+				console.log("Added new user to userlist: " + nick);
+			});
+
+
+			socket.on('fulluserlist', function(data){
+				var allnicks = data.users;
+				console.log("allnicks: "+ allnicks);
+				activeuser = data.turn;
+				console.log("activeuser: "+ activeuser);
+			
+				document.getElementById('userlist').innerHTML = '';
+				
+				//add all users
+				for (var i=0; i < allnicks.length; i++){
+					document.getElementById('userlist').innerHTML += ("<div id=\"id_" + allnicks[i] + "\">" + "User joined: " + allnicks[i] + "</div>")	
+					console.log("allnicks[" + i + "]: "+ allnicks[i]);
+
+				//show green for whoever's turn it is
+					if (i == activeuser){
+						document.getElementById("id_" + allnicks[activeuser]).style.color = "green";
+					} else {
+						document.getElementById("id_" + allnicks[i]).style.color = "black";
+					}
+				}
+
+				// if (allnicks.length){
+				// 	document.getElementById("seewholestory").style.visibility = "visible";
+				// } else {
+				// 	document.getElementById("seewholestory").style.visibility = "hidden";
+				// }
+				
+				console.log("Showed everyone joined");
+				
+			});
+			
+			socket.on('updatemessage', function(messagedata) {
+
+				var pacglen = messagedata.thelength;
+				var turn = messagedata.turn;
+				var nicknames = messagedata.thenicknames;
+				var imagesrc = messagedata.themessage;
+
+				//show new message for myself and only the next person
+				if(myId == activeuser || myId == activeuser+1) {
+					document.getElementById("messages").src = imagesrc;
+			    	};
+
+			    console.log("finished updatemessage");
+			   
+			});
+
+		// Send a messaage
+		var sendmessage = function() {
+
+			var fileElement = document.getElementById('message');
+			fileElement.onchange = function() {
+				var fileReader = new FileReader();
+				fileReader.onload = function(evt){
+					//place uploaded video into hiddenvid video tag
+					document.getElementById('message').src = evt.target.result;
+
+					//send to server
+					socket.emit('message', evt.target.result);
+					document.getElementById("message").style.display = 'none';
+					document.getElementById("button").style.display = 'none';
+				};
+			
+			//take the first file uploaded
+			file = fileElement.files[0];
+
+			//read video dataurl
+			fileReader.readAsDataURL(file);
+			console.log("finished sendmessage()")
+			};
+				
+		};
+			
+			
+		var showall = function(){
+			var wholestory = document.getElementById('wholestory');
+			//detect if the rectangle button is clicked or not 
+			socket.emit('seeall', "");
+			console.log("see whole story clicked");
+
+		   };
+		   
+		socket.on('seeall', function(data){
+			console.log('data length: ' + data.length);
+
+			for(var m = 0; m< data.length; m++){
+				console.log("add storyline: " + m);
+
+				var pathArray = data[m].split("/");
+				var newPathname = "";
+				var lastpart = pathArray[pathArray.length-1];
+
+				for (i = 1; i < pathArray.length-1; i++){
+						newPathname += pathArray[i] += "/";
+				}
+
+				newPathname += lastpart;
+				console.log("newPathname: "+ newPathname);
+				document.getElementById('wholestory').innerHTML += "<div><img id='img_"+ m + "' src='data:image/" + newPathname + "'></div>"; 
+			}
+		});
+
+
+
+		</script>
+</head>
+<body onload="sendmessage();">
+
+	<img src="" id="messages">
+
+	<input type="file" id="message" name="message">
+	<input type="button" id ="button" value="Send Message" onclick="sendmessage();">
+
+	<input type ="button" id="seewholestory" value="See Whole Story" onclick="showall();">
+	<div id="userlist">No Users Yet</div>
+	<div id="wholestory"><b>Full Story Here:</b></div>
+
+</body>
+</html>
